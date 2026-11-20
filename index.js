@@ -1,12 +1,4 @@
 require('dotenv').config();
-const dns = require('dns');
-// Set robust fallback public DNS to prevent Windows querySrv ECONNREFUSED issues on MongoDB Atlas
-try {
-  dns.setServers(['8.8.8.8', '1.1.1.1', '8.8.4.4']);
-} catch (e) {
-  console.warn('DNS server override warning:', e.message);
-}
-
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
@@ -20,13 +12,55 @@ const paymentRoutes = require('./routes/paymentRoutes');
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+// Database Connection Cache for Vercel Serverless Function
+let cached = global.mongoose;
+if (!cached) {
+  cached = global.mongoose = { conn: null, promise: null };
+}
+
+async function connectDB() {
+  if (cached.conn) {
+    return cached.conn;
+  }
+
+  if (!cached.promise) {
+    const opts = {
+      bufferCommands: false,
+      serverSelectionTimeoutMS: 15000,
+    };
+
+    const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://sadik1234:1jhKDWPpR2CUK3r2@cluster0.gdfbpex.mongodb.net/wedplan?retryWrites=true&w=majority';
+    cached.promise = mongoose.connect(MONGODB_URI, opts).then((m) => m);
+  }
+
+  try {
+    cached.conn = await cached.promise;
+  } catch (e) {
+    cached.promise = null;
+    throw e;
+  }
+
+  return cached.conn;
+}
+
+// Ensure DB connection for every incoming request
+app.use(async (req, res, next) => {
+  try {
+    await connectDB();
+    next();
+  } catch (err) {
+    console.error('Serverless DB connection error:', err);
+    res.status(500).json({ success: false, message: 'Database connection failed', error: err.message });
+  }
+});
+
 // Middleware
 app.use(cors({
   origin: '*',
   credentials: true
 }));
 
-// Stripe webhook route needs raw body parser (mounted inside paymentRoutes or handled specifically)
+// Stripe webhook route needs raw body parser
 app.use('/api/payment/webhook', express.raw({ type: 'application/json' }));
 
 app.use(express.json({ limit: '10mb' }));
@@ -37,6 +71,7 @@ app.get('/api/health', (req, res) => {
   res.json({
     status: 'ok',
     platform: 'WedPlan Wedding Planning Platform API',
+    database: mongoose.connection.readyState === 1 ? 'connected' : 'connecting',
     timestamp: new Date().toISOString()
   });
 });
@@ -67,22 +102,13 @@ app.use((err, req, res, next) => {
   });
 });
 
-// Connect Database & Start Server
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://sadik1234:1jhKDWPpR2CUK3r2@cluster0.gdfbpex.mongodb.net/wedplan?retryWrites=true&w=majority';
-
-mongoose.connect(MONGODB_URI, {
-  serverSelectionTimeoutMS: 15000
-})
-.then(() => {
-  console.log('Connected to MongoDB database (wedplan)');
-  if (process.env.NODE_ENV !== 'production' || process.env.START_SERVER) {
+// Start server when run locally
+if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
+  connectDB().then(() => {
     app.listen(PORT, () => {
-      console.log(`WedPlan Server is running on port ${PORT}`);
+      console.log(`WedPlan Server running locally on port ${PORT}`);
     });
-  }
-})
-.catch((err) => {
-  console.error('MongoDB connection failed:', err.message);
-});
+  });
+}
 
 module.exports = app;
