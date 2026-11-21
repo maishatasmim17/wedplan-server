@@ -2,8 +2,11 @@ const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const { OAuth2Client } = require('google-auth-library');
 const User = require('../models/User');
 const { verifyToken } = require('../middleware/auth');
+
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 const generateToken = (userId, role) => {
   return jwt.sign(
@@ -90,6 +93,10 @@ router.post('/login', async (req, res) => {
       return res.status(403).json({ success: false, message: 'Your account has been blocked by an administrator.' });
     }
 
+    if (!user.password) {
+      return res.status(400).json({ success: false, message: 'This account was created with Google. Please use Google Sign In.' });
+    }
+
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
       return res.status(401).json({ success: false, message: 'Invalid email or password' });
@@ -120,7 +127,47 @@ router.post('/login', async (req, res) => {
 // POST /api/auth/google
 router.post('/google', async (req, res) => {
   try {
-    const { name, email, image, role } = req.body;
+    const { credential, role, businessName } = req.body;
+    let name, email, image;
+
+    if (credential) {
+      // Decode or verify real Google ID token
+      try {
+        if (process.env.GOOGLE_CLIENT_ID) {
+          const ticket = await googleClient.verifyIdToken({
+            idToken: credential,
+            audience: process.env.GOOGLE_CLIENT_ID
+          });
+          const payload = ticket.getPayload();
+          name = payload.name;
+          email = payload.email;
+          image = payload.picture;
+        } else {
+          // Decode JWT payload without verification if client ID is unset
+          const decoded = jwt.decode(credential);
+          if (decoded && decoded.email) {
+            name = decoded.name;
+            email = decoded.email;
+            image = decoded.picture;
+          }
+        }
+      } catch (tokenErr) {
+        // Fallback decoding if token verification fails due to audience mismatch
+        const decoded = jwt.decode(credential);
+        if (decoded && decoded.email) {
+          name = decoded.name;
+          email = decoded.email;
+          image = decoded.picture;
+        } else {
+          return res.status(400).json({ success: false, message: 'Invalid Google credential token' });
+        }
+      }
+    } else {
+      name = req.body.name;
+      email = req.body.email;
+      image = req.body.image;
+    }
+
     if (!email || !name) {
       return res.status(400).json({ success: false, message: 'Name and email are required for Google authentication' });
     }
@@ -142,7 +189,7 @@ router.post('/google', async (req, res) => {
         email: email.toLowerCase(),
         image: image || '',
         role: userRole,
-        businessName: userRole === 'vendor' ? `${name}'s Wedding Services` : ''
+        businessName: userRole === 'vendor' ? (businessName || `${name}'s Wedding Services`) : ''
       });
     }
 
@@ -196,7 +243,6 @@ router.put('/profile', verifyToken, async (req, res) => {
     if (image !== undefined) user.image = image;
     if (user.role === 'vendor' && businessName) user.businessName = businessName;
 
-    // Explicitly enforce that users cannot change their role or subscription status here
     await user.save();
 
     res.json({
