@@ -41,11 +41,11 @@ WedPlan API is a robust Express.js backend connecting to MongoDB Atlas, supporti
 1. Create a `.env` file in the root directory:
    ```env
    PORT=5000
-   MONGODB_URI=mongodb+srv://<username>:<password>@cluster0.gdfbpex.mongodb.net/wedplan?retryWrites=true&w=majority
-   JWT_SECRET=your_secret_key
-   STRIPE_SECRET_KEY=sk_test_...
+   MONGODB_URI=mongodb+srv://<username>:<password>@<cluster-host>/<database>?retryWrites=true&w=majority
+   JWT_SECRET=your_jwt_secret
+   STRIPE_SECRET_KEY=sk_test_your_stripe_test_key
    CLIENT_URL=http://localhost:3000
-   GOOGLE_CLIENT_ID=152104050938-d7fvein7vsgdce3nr88fusuqmpvc3sl5.apps.googleusercontent.com
+   GOOGLE_CLIENT_ID=your_google_client_id
    ```
 2. (Optional) Seed the database with demo users and services:
    ```bash
