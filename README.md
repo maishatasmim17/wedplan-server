@@ -38,20 +38,12 @@ WedPlan API is a robust Express.js backend connecting to MongoDB Atlas, supporti
    ```
 
 ## How to Run the Project Locally
-1. Create a `.env` file in the root directory:
-   ```env
-   PORT=5000
-   MONGODB_URI=mongodb+srv://<username>:<password>@<cluster-host>/<database>?retryWrites=true&w=majority
-   JWT_SECRET=your_jwt_secret
-   STRIPE_SECRET_KEY=sk_test_your_stripe_test_key
-   CLIENT_URL=http://localhost:3000
-   GOOGLE_CLIENT_ID=your_google_client_id
    ```
-2. (Optional) Seed the database with demo users and services:
+1. (Optional) Seed the database with demo users and services:
    ```bash
    node seed.js
    ```
-3. Start the server:
+2. Start the server:
    ```bash
    node index.js
    ```
@@ -71,8 +63,6 @@ WedPlan API is a robust Express.js backend connecting to MongoDB Atlas, supporti
 4. `POST /api/payment/webhook` (raw body + Stripe signature verification) is the authoritative event handler for `checkout.session.completed`, `invoice.payment_succeeded`, `customer.subscription.deleted/updated`, `checkout.session.expired` and `charge.refunded`.
 
 If the Stripe test key is missing/invalid, checkout falls back to a clearly labelled **simulated test checkout** at `/payment/demo-checkout`. Access is still granted only by the server-side confirmation endpoint, never by the return URL. No more invalid/blank redirects.
-
-**Other endpoints**: `/api/payment/status`, `/api/payment/create-portal-session`, `/api/payment/cancel-subscription`, `/api/payment/demo-session`, `/api/payment/demo-confirm`, `/api/payment/demo-cancel`.
 
 **Stripe CLI for local webhooks**
 ```bash
