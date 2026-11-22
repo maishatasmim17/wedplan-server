@@ -9,7 +9,9 @@ const userSchema = new mongoose.Schema({
   isBlocked: { type: Boolean, default: false },
   businessName: { type: String, default: '' }, // For vendors
   subscriptionPlan: { type: String, enum: ['free', 'premium'], default: 'free' },
-  subscriptionExpiresAt: { type: Date, default: null }
+  subscriptionExpiresAt: { type: Date, default: null },
+  stripeCustomerId: { type: String, default: '' },
+  stripeSubscriptionId: { type: String, default: '' }
 }, { timestamps: true });
 
 module.exports = mongoose.model('User', userSchema);

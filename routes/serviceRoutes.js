@@ -3,6 +3,7 @@ const router = express.Router();
 const Service = require('../models/Service');
 const User = require('../models/User');
 const { verifyToken, verifyRole } = require('../middleware/auth');
+const { isPremiumActive } = require('../utils/subscription');
 
 // GET /api/services - Public service listing with search, category filter, location filter, price sort
 router.get('/', async (req, res) => {
@@ -116,9 +117,9 @@ router.post('/', verifyToken, verifyRole('vendor'), async (req, res) => {
       return res.status(400).json({ success: false, message: 'All required fields must be filled' });
     }
 
-    // Check Free Plan limitation: max 3 active services
-    const vendor = await User.findById(req.user._id);
-    const isPremium = vendor.subscriptionPlan === 'premium';
+    // Check Free Plan limitation: max 3 active services (expired plans are free)
+    const vendor = req.user;
+    const isPremium = isPremiumActive(vendor);
 
     if (!isPremium) {
       const activeCount = await Service.countDocuments({
@@ -175,6 +176,20 @@ router.put('/:id', verifyToken, verifyRole('vendor'), async (req, res) => {
     }
 
     const { serviceName, category, description, price, location, images, isActive } = req.body;
+
+    // Re-publishing a service also counts towards the free 3-service limit.
+    if (isActive === true && !service.isActive && !isPremiumActive(req.user)) {
+      const activeCount = await Service.countDocuments({
+        vendorId: req.user._id,
+        isActive: true
+      });
+      if (activeCount >= 3) {
+        return res.status(403).json({
+          success: false,
+          message: 'Free tier limit reached! Upgrade to Premium to publish more than 3 active services.'
+        });
+      }
+    }
 
     if (serviceName) service.serviceName = serviceName;
     if (category) service.category = category;

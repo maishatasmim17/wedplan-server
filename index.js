@@ -62,13 +62,28 @@ app.use(async (req, res, next) => {
   }
 });
 
-// Middleware
+// Middleware — only known clients may call the payment/API endpoints
+const allowedOrigins = [
+  process.env.CLIENT_URL,
+  'http://localhost:3000',
+  'http://127.0.0.1:3000'
+].filter(Boolean).map((origin) => origin.replace(/\/$/, ''));
+
 app.use(cors({
-  origin: '*',
+  origin: (origin, callback) => {
+    if (!origin) return callback(null, true); // server-to-server / Stripe
+    const clean = origin.replace(/\/$/, '');
+    const isVercelPreview = (() => {
+      try { return new URL(clean).hostname.endsWith('.vercel.app'); } catch { return false; }
+    })();
+    if (allowedOrigins.includes(clean) || isVercelPreview) return callback(null, true);
+    return callback(new Error('Origin not allowed by CORS'));
+  },
   credentials: true
 }));
 
-// Stripe webhook route needs raw body parser
+// Stripe webhook signature verification needs the untouched raw body.
+// This MUST stay before express.json().
 app.use('/api/payment/webhook', express.raw({ type: 'application/json' }));
 
 app.use(express.json({ limit: '10mb' }));

@@ -56,3 +56,28 @@ WedPlan API is a robust Express.js backend connecting to MongoDB Atlas, supporti
    node index.js
    ```
    Server will run on [http://localhost:5000](http://localhost:5000).
+
+## Payment / Premium Subscription (Stripe Test Mode)
+
+**Environment variables** (see `.env.example`):
+- `STRIPE_SECRET_KEY` — a real Stripe **test** key (`sk_test_...`). Never put this in the client.
+- `STRIPE_WEBHOOK_SECRET` — signing secret from the Stripe webhook endpoint.
+- `CLIENT_URL` — origin the checkout pages return to (localhost redirects are detected automatically).
+
+**Flow**
+1. `POST /api/payment/create-checkout-session` (vendor JWT only) creates a Stripe Checkout Session and returns its URL. The vendor id comes from the JWT, never from the request body.
+2. Stripe redirects to `/payment/success?session_id=...` or `/payment/cancel?session_id=...`.
+3. The success page calls `GET /api/payment/verify-session?sessionId=...`. The server retrieves the session from Stripe, checks the vendor id and payment status, writes a `Transaction` and activates Premium. A browser redirect alone can never activate a plan.
+4. `POST /api/payment/webhook` (raw body + Stripe signature verification) is the authoritative event handler for `checkout.session.completed`, `invoice.payment_succeeded`, `customer.subscription.deleted/updated`, `checkout.session.expired` and `charge.refunded`.
+
+If the Stripe test key is missing/invalid, checkout falls back to a clearly labelled **simulated test checkout** at `/payment/demo-checkout`. Access is still granted only by the server-side confirmation endpoint, never by the return URL. No more invalid/blank redirects.
+
+**Other endpoints**: `/api/payment/status`, `/api/payment/create-portal-session`, `/api/payment/cancel-subscription`, `/api/payment/demo-session`, `/api/payment/demo-confirm`, `/api/payment/demo-cancel`.
+
+**Stripe CLI for local webhooks**
+```bash
+stripe listen --forward-to localhost:5000/api/payment/webhook
+# copy the whsec_... value into STRIPE_WEBHOOK_SECRET
+```
+
+Free vendors can publish at most **3 active services**; expired/cancelled Premium plans are downgraded automatically on the next authenticated request.

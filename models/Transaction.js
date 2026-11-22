@@ -7,7 +7,18 @@ const transactionSchema = new mongoose.Schema({
   currency: { type: String, default: 'usd' },
   stripeSessionId: { type: String, default: '' },
   stripeSubscriptionId: { type: String, default: '' },
-  status: { type: String, default: 'completed' }
+  stripeInvoiceId: { type: String, default: '' },
+  stripePaymentIntentId: { type: String, default: '' },
+  // stripe:webhook | stripe:verified-session | demo:webhook
+  verifiedBy: { type: String, default: '' },
+  status: {
+    type: String,
+    enum: ['pending', 'completed', 'refunded', 'canceled', 'failed'],
+    default: 'completed'
+  }
 }, { timestamps: true });
+
+transactionSchema.index({ stripeSessionId: 1 }, { sparse: true });
+transactionSchema.index({ stripeInvoiceId: 1 }, { sparse: true });
 
 module.exports = mongoose.model('Transaction', transactionSchema);

@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const { syncSubscriptionStatus } = require('../utils/subscription');
 
 const verifyToken = async (req, res, next) => {
   try {
@@ -20,7 +21,8 @@ const verifyToken = async (req, res, next) => {
       return res.status(403).json({ success: false, message: 'Forbidden: Account has been blocked by administrator' });
     }
 
-    req.user = user;
+    // An expired Premium plan must never keep unlocking vendor features.
+    req.user = await syncSubscriptionStatus(user);
     next();
   } catch (error) {
     return res.status(401).json({ success: false, message: 'Unauthorized: Invalid or expired token', error: error.message });

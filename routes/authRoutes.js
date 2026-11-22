@@ -228,6 +228,7 @@ router.get('/me', verifyToken, async (req, res) => {
       businessName: req.user.businessName,
       subscriptionPlan: req.user.subscriptionPlan,
       subscriptionExpiresAt: req.user.subscriptionExpiresAt,
+      stripeSubscriptionId: req.user.stripeSubscriptionId || '',
       isBlocked: req.user.isBlocked
     }
   });
